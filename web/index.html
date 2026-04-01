@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Arlington Housing Pulse</title>
+    <meta
+      name="description"
+      content="A static GitHub Pages dashboard for Arlington County residential sales, powered by county open data JSON."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero reveal">
+        <div class="hero-copy">
+          <p class="eyebrow">Arlington County, Virginia</p>
+          <h1>Housing Pulse</h1>
+          <p class="hero-text">
+            A GitHub Pages dashboard built from Arlington County open-data JSON.
+            It tracks market-like residential sales, price movement, property-type mix,
+            and where transaction density is heating up across the county.
+          </p>
+        </div>
+        <div class="hero-meta panel">
+          <div>
+            <span class="meta-label">Build</span>
+            <strong id="generated-at">Loading...</strong>
+          </div>
+          <div>
+            <span class="meta-label">Coverage</span>
+            <strong id="coverage-window">Loading...</strong>
+          </div>
+          <div>
+            <span class="meta-label">Source</span>
+            <a id="source-link" href="#" target="_blank" rel="noreferrer">County API</a>
+          </div>
+        </div>
+      </header>
+
+      <section class="controls panel reveal">
+        <div class="control-block">
+          <span class="control-label">Window</span>
+          <div class="chip-row" id="window-controls">
+            <button class="chip is-active" data-window="3">3 years</button>
+            <button class="chip" data-window="5">5 years</button>
+            <button class="chip" data-window="10">10 years</button>
+          </div>
+        </div>
+        <div class="control-block">
+          <label class="control-label" for="property-type">Property type</label>
+          <select id="property-type"></select>
+        </div>
+        <div class="control-block notes-block">
+          <span class="control-label">Method</span>
+          <p id="method-note">
+            Residential transactions only, filtered to market-like transfers and active parcel coordinates.
+          </p>
+        </div>
+      </section>
+
+      <section class="stats-grid reveal" id="stats-grid">
+        <article class="stat-card panel">
+          <span class="stat-label">Transactions</span>
+          <strong class="stat-value" id="transactions-value">-</strong>
+          <p class="stat-foot" id="transactions-foot">-</p>
+        </article>
+        <article class="stat-card panel">
+          <span class="stat-label">Median sale price</span>
+          <strong class="stat-value" id="median-value">-</strong>
+          <p class="stat-foot" id="median-foot">-</p>
+        </article>
+        <article class="stat-card panel">
+          <span class="stat-label">Total volume</span>
+          <strong class="stat-value" id="volume-value">-</strong>
+          <p class="stat-foot" id="volume-foot">-</p>
+        </article>
+        <article class="stat-card panel">
+          <span class="stat-label">Most recent sale</span>
+          <strong class="stat-value" id="recent-value">-</strong>
+          <p class="stat-foot" id="recent-foot">-</p>
+        </article>
+      </section>
+
+      <section class="chart-grid">
+        <article class="panel reveal">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Activity</p>
+              <h2>Monthly transaction rhythm</h2>
+            </div>
+          </div>
+          <canvas id="transactions-chart" aria-label="Monthly transaction counts" role="img"></canvas>
+        </article>
+
+        <article class="panel reveal">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Pricing</p>
+              <h2>Quarterly median sale price</h2>
+            </div>
+          </div>
+          <canvas id="price-chart" aria-label="Quarterly median sale price" role="img"></canvas>
+        </article>
+
+        <article class="panel reveal">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Mix</p>
+              <h2>Which homes are trading?</h2>
+            </div>
+          </div>
+          <canvas id="mix-chart" aria-label="Transactions by property type" role="img"></canvas>
+        </article>
+
+        <article class="panel reveal">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Geography</p>
+              <h2>ZIP codes with the strongest median pricing</h2>
+            </div>
+          </div>
+          <canvas id="zip-chart" aria-label="Median sale price by ZIP code" role="img"></canvas>
+        </article>
+      </section>
+
+      <section class="map-section panel reveal">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Heatmap</p>
+            <h2>Where transaction density is clustering</h2>
+          </div>
+          <p class="section-copy">
+            The heatmap aggregates qualifying sales into a small spatial grid to keep the page fast while still
+            showing concentration across Arlington.
+          </p>
+        </div>
+        <div id="sales-map" aria-label="Heatmap of residential sales density"></div>
+      </section>
+
+      <section class="detail-grid">
+        <article class="panel reveal">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Recent deals</p>
+              <h2>Latest recorded sales</h2>
+            </div>
+          </div>
+          <div id="recent-sales" class="sales-list"></div>
+        </article>
+
+        <article class="panel reveal">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Dataset notes</p>
+              <h2>What this page includes</h2>
+            </div>
+          </div>
+          <ul id="dataset-notes" class="note-list"></ul>
+        </article>
+      </section>
+    </div>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+    <script src="./app.js" type="module"></script>
+  </body>
+</html>
