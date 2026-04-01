@@ -6,6 +6,9 @@ const state = {
   charts: {},
   map: null,
   heatLayer: null,
+  mapReady: false,
+  mapVisible: false,
+  heatCache: new Map(),
 };
 
 const currency = new Intl.NumberFormat("en-US", {
@@ -68,7 +71,7 @@ async function boot() {
   populatePropertyTypes(payload.propertyTypes);
   renderNotes(payload.notes);
   initializeCharts();
-  initializeMap();
+  installMapLoader();
   render();
 }
 
@@ -140,7 +143,12 @@ function initializeCharts() {
 }
 
 function initializeMap() {
+  if (state.mapReady) {
+    return;
+  }
+
   const map = L.map("sales-map", {
+    preferCanvas: true,
     scrollWheelZoom: false,
     zoomControl: false,
   }).setView([38.8816, -77.091], 12);
@@ -168,6 +176,33 @@ function initializeMap() {
       0.95: "#6d2530",
     },
   }).addTo(map);
+  state.mapReady = true;
+}
+
+function installMapLoader() {
+  const mapSection = document.querySelector(".map-section");
+  const observer = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) {
+          continue;
+        }
+
+        initializeMap();
+        state.mapVisible = true;
+        state.map.invalidateSize();
+        renderMap(getFilteredRecords());
+        observer.disconnect();
+        break;
+      }
+    },
+    {
+      rootMargin: "220px 0px",
+      threshold: 0.1,
+    },
+  );
+
+  observer.observe(mapSection);
 }
 
 function render() {
@@ -310,11 +345,20 @@ function renderRecentSales(records) {
 }
 
 function renderMap(records) {
+  if (!state.mapReady || !state.mapVisible) {
+    return;
+  }
+
   const heatPoints = buildHeatGrid(records);
   state.heatLayer.setLatLngs(heatPoints);
 }
 
 function buildHeatGrid(records) {
+  const cacheKey = `${state.windowYears}:${state.propertyType}:${records.length}`;
+  if (state.heatCache.has(cacheKey)) {
+    return state.heatCache.get(cacheKey);
+  }
+
   const grid = new Map();
   const cellSize = 0.004;
 
@@ -330,11 +374,13 @@ function buildHeatGrid(records) {
   }
 
   const maxCount = Math.max(...Array.from(grid.values()).map((item) => item.count), 1);
-  return Array.from(grid.values()).map((item) => [
+  const heatPoints = Array.from(grid.values()).map((item) => [
     item.lat / item.count,
     item.lon / item.count,
     Math.max(0.2, item.count / maxCount),
   ]);
+  state.heatCache.set(cacheKey, heatPoints);
+  return heatPoints;
 }
 
 function sharedLineOptions(label, currencyAxis = false) {
@@ -346,6 +392,10 @@ function sharedLineOptions(label, currencyAxis = false) {
       mode: "index",
     },
     plugins: {
+      decimation: {
+        enabled: true,
+        algorithm: "lttb",
+      },
       legend: {
         display: false,
       },
@@ -388,6 +438,10 @@ function sharedBarOptions() {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
+      decimation: {
+        enabled: true,
+        algorithm: "lttb",
+      },
       legend: { display: false },
       tooltip: {
         callbacks: {
@@ -416,6 +470,10 @@ function sharedHorizontalBarOptions() {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
+      decimation: {
+        enabled: true,
+        algorithm: "lttb",
+      },
       legend: { display: false },
       tooltip: {
         callbacks: {

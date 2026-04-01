@@ -244,8 +244,27 @@ select {
 }
 
 canvas {
+  display: block;
+}
+
+.chart-frame {
+  position: relative;
   width: 100%;
+  min-height: 0;
+  contain: layout paint;
+}
+
+.chart-frame-lg {
+  height: 340px;
+}
+
+.chart-frame-sm {
   height: 320px;
+}
+
+.chart-frame canvas {
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .map-section {
@@ -359,5 +378,10 @@ canvas {
 
   #sales-map {
     height: 420px;
+  }
+
+  .chart-frame-lg,
+  .chart-frame-sm {
+    height: 280px;
   }
 }
