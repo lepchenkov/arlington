@@ -9,6 +9,9 @@ const state = {
   mapReady: false,
   mapVisible: false,
   heatCache: new Map(),
+  exportDates: [],
+  exportStartIndex: 0,
+  exportEndIndex: 0,
 };
 
 const currency = new Intl.NumberFormat("en-US", {
@@ -40,6 +43,9 @@ const quarterLabelFormatter = new Intl.DateTimeFormat("en-US", {
 
 const propertyTypeSelect = document.querySelector("#property-type");
 const windowControls = document.querySelector("#window-controls");
+const exportStartRange = document.querySelector("#export-start-range");
+const exportEndRange = document.querySelector("#export-end-range");
+const exportButton = document.querySelector("#export-button");
 
 boot().catch((error) => {
   console.error(error);
@@ -66,10 +72,13 @@ async function boot() {
       saleQuarter: `${saleDate.getFullYear()}-Q${Math.floor(saleDate.getMonth() / 3) + 1}`,
     };
   });
+  state.exportDates = Array.from(new Set(payload.records.map((record) => record.saleDate))).sort();
+  state.exportEndIndex = Math.max(state.exportDates.length - 1, 0);
 
   populateMeta(payload);
   populatePropertyTypes(payload.propertyTypes);
   renderNotes(payload.notes);
+  initializeExportControls();
   initializeCharts();
   installMapLoader();
   render();
@@ -93,6 +102,22 @@ function bindControls() {
     state.propertyType = event.target.value;
     render();
   });
+
+  exportStartRange.addEventListener("input", () => {
+    const nextValue = Number(exportStartRange.value);
+    state.exportStartIndex = Math.min(nextValue, state.exportEndIndex);
+    exportStartRange.value = String(state.exportStartIndex);
+    renderExportControls();
+  });
+
+  exportEndRange.addEventListener("input", () => {
+    const nextValue = Number(exportEndRange.value);
+    state.exportEndIndex = Math.max(nextValue, state.exportStartIndex);
+    exportEndRange.value = String(state.exportEndIndex);
+    renderExportControls();
+  });
+
+  exportButton.addEventListener("click", exportToExcel);
 }
 
 function populateMeta(payload) {
@@ -114,6 +139,15 @@ function populatePropertyTypes(propertyTypes) {
 function renderNotes(notes) {
   const noteList = document.querySelector("#dataset-notes");
   noteList.innerHTML = notes.map((note) => `<li>${note}</li>`).join("");
+}
+
+function initializeExportControls() {
+  const maxIndex = Math.max(state.exportDates.length - 1, 0);
+  exportStartRange.max = String(maxIndex);
+  exportEndRange.max = String(maxIndex);
+  exportStartRange.value = String(state.exportStartIndex);
+  exportEndRange.value = String(state.exportEndIndex);
+  renderExportControls();
 }
 
 function initializeCharts() {
@@ -214,6 +248,7 @@ function render() {
   renderZipChart(filtered);
   renderRecentSales(filtered);
   renderMap(filtered);
+  renderExportControls();
 }
 
 function getFilteredRecords() {
@@ -239,6 +274,99 @@ function getLatestDate() {
     }
     return latest;
   }, null);
+}
+
+function getExportRecords() {
+  const startDate = state.exportDates[state.exportStartIndex];
+  const endDate = state.exportDates[state.exportEndIndex];
+  const startBoundary = new Date(`${startDate}T00:00:00`);
+  const endBoundary = new Date(`${endDate}T23:59:59`);
+
+  return state.records.filter((record) => {
+    if (record.saleDate < startBoundary) {
+      return false;
+    }
+    if (record.saleDate > endBoundary) {
+      return false;
+    }
+    if (state.propertyType !== "All" && record.propertyType !== state.propertyType) {
+      return false;
+    }
+    return true;
+  });
+}
+
+function renderExportControls() {
+  if (!state.exportDates.length) {
+    return;
+  }
+
+  const startDate = state.exportDates[state.exportStartIndex];
+  const endDate = state.exportDates[state.exportEndIndex];
+  const exportRecords = getExportRecords();
+
+  setText("#export-start-label", startDate);
+  setText("#export-end-label", endDate);
+  setText(
+    "#export-count",
+    `${exportRecords.length.toLocaleString("en-US")} records ready for Excel export`,
+  );
+  exportButton.disabled = exportRecords.length === 0;
+  updateRangeTrack();
+}
+
+function updateRangeTrack() {
+  const fill = document.querySelector("#range-track-fill");
+  const maxIndex = Math.max(state.exportDates.length - 1, 1);
+  const startPercent = (state.exportStartIndex / maxIndex) * 100;
+  const endPercent = (state.exportEndIndex / maxIndex) * 100;
+  fill.style.left = `${startPercent}%`;
+  fill.style.width = `${Math.max(endPercent - startPercent, 0)}%`;
+}
+
+function exportToExcel() {
+  const records = getExportRecords();
+  if (!records.length) {
+    return;
+  }
+
+  const workbook = window.XLSX.utils.book_new();
+  const startDate = state.exportDates[state.exportStartIndex];
+  const endDate = state.exportDates[state.exportEndIndex];
+  const propertyTypeLabel = state.propertyType === "All" ? "All residential types" : state.propertyType;
+
+  const summarySheet = window.XLSX.utils.aoa_to_sheet([
+    ["Arlington Housing Pulse Export"],
+    ["Generated At", state.payload.generatedAt],
+    ["Property Type", propertyTypeLabel],
+    ["Export Start", startDate],
+    ["Export End", endDate],
+    ["Record Count", records.length],
+  ]);
+
+  const transactionRows = records.map((record) => ({
+    "Sale Date": formatDateIso(record.saleDate),
+    Address: record.address,
+    "Property Type": record.propertyType,
+    "Sale Amount": record.saleAmount,
+    "ZIP Code": record.zipCode,
+    Latitude: record.lat,
+    Longitude: record.lon,
+  }));
+  const transactionSheet = window.XLSX.utils.json_to_sheet(transactionRows);
+  transactionSheet["!cols"] = [
+    { wch: 12 },
+    { wch: 28 },
+    { wch: 18 },
+    { wch: 14 },
+    { wch: 10 },
+    { wch: 12 },
+    { wch: 12 },
+  ];
+
+  window.XLSX.utils.book_append_sheet(workbook, summarySheet, "Summary");
+  window.XLSX.utils.book_append_sheet(workbook, transactionSheet, "Transactions");
+  window.XLSX.writeFile(workbook, buildExportFilename(startDate, endDate), { compression: true });
 }
 
 function renderStats(records) {
@@ -549,6 +677,18 @@ function quarterLabel(quarterKey) {
   const [year, quarter] = quarterKey.split("-Q");
   const month = Number(quarter) * 3 - 2;
   return quarterLabelFormatter.format(new Date(`${year}-${String(month).padStart(2, "0")}-01T00:00:00`));
+}
+
+function formatDateIso(value) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function buildExportFilename(startDate, endDate) {
+  const propertyTypeSlug = state.propertyType.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  return `arlington-sales-${propertyTypeSlug || "all"}-${startDate}-to-${endDate}.xlsx`;
 }
 
 function setText(selector, value) {

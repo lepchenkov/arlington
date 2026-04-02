@@ -71,6 +71,39 @@
         </div>
       </section>
 
+      <section class="export-panel panel reveal">
+        <div class="section-head export-head">
+          <div>
+            <p class="eyebrow">Export</p>
+            <h2>Download transactions to Excel</h2>
+          </div>
+          <p class="section-copy">
+            Use the date range below to export Arlington sales for the current property-type filter.
+          </p>
+        </div>
+        <div class="export-range-values">
+          <div class="export-value-card">
+            <span class="control-label">From</span>
+            <strong id="export-start-label">Loading...</strong>
+          </div>
+          <div class="export-value-card">
+            <span class="control-label">To</span>
+            <strong id="export-end-label">Loading...</strong>
+          </div>
+        </div>
+        <div class="range-stack" aria-label="Export date range slider">
+          <div class="range-track">
+            <div class="range-track-fill" id="range-track-fill"></div>
+          </div>
+          <input id="export-start-range" class="range-input" type="range" min="0" max="0" step="1" value="0" />
+          <input id="export-end-range" class="range-input" type="range" min="0" max="0" step="1" value="0" />
+        </div>
+        <div class="export-actions">
+          <p id="export-count" class="export-count">Loading...</p>
+          <button id="export-button" class="export-button" type="button">Export to Excel</button>
+        </div>
+      </section>
+
       <section class="stats-grid reveal" id="stats-grid">
         <article class="stat-card panel">
           <span class="stat-label">Transactions</span>
@@ -191,6 +224,10 @@
       crossorigin=""
     ></script>
     <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"
+      crossorigin="anonymous"
+    ></script>
     <script src="./app.js" type="module"></script>
   </body>
 </html>
