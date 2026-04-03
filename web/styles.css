@@ -1,5 +1,4 @@
 :root {
-  color-scheme: light;
   --bg: #f4ede3;
   --bg-deep: #f0e5d8;
   --bg-accent-1: rgba(211, 161, 74, 0.18);
@@ -21,8 +20,6 @@
   --thumb-border: rgba(255, 255, 255, 0.9);
   --thumb-shadow: 0 6px 18px rgba(54, 91, 116, 0.26);
   --button-shadow: 0 14px 34px rgba(54, 91, 116, 0.2);
-  --theme-button-bg: rgba(255, 255, 255, 0.56);
-  --theme-button-border: rgba(23, 48, 42, 0.14);
   --chart-grid: rgba(23, 48, 42, 0.08);
   --chart-line-cool: #365b74;
   --chart-line-cool-fill: rgba(54, 91, 116, 0.16);
@@ -34,44 +31,6 @@
   --chart-bar-4: #2f7668;
   --chart-zip-bar: #d3a14a;
   --shadow: 0 24px 60px rgba(43, 53, 48, 0.12);
-}
-
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --bg: #071115;
-  --bg-deep: #102026;
-  --bg-accent-1: rgba(211, 161, 74, 0.1);
-  --bg-accent-2: rgba(74, 127, 145, 0.16);
-  --pattern-color: rgba(214, 232, 223, 0.03);
-  --panel: rgba(15, 25, 30, 0.82);
-  --panel-border: rgba(180, 206, 196, 0.12);
-  --ink: #eef5f1;
-  --muted: #9fb5ac;
-  --accent: #dd845f;
-  --accent-soft: #e7a988;
-  --accent-cool: #79a9be;
-  --accent-gold: #dbb162;
-  --surface: rgba(20, 31, 37, 0.8);
-  --surface-strong: rgba(17, 27, 32, 0.9);
-  --surface-border: rgba(180, 206, 196, 0.12);
-  --section-border: rgba(180, 206, 196, 0.12);
-  --range-track-bg: rgba(180, 206, 196, 0.18);
-  --thumb-border: rgba(10, 17, 21, 0.92);
-  --thumb-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
-  --button-shadow: 0 14px 34px rgba(0, 0, 0, 0.32);
-  --theme-button-bg: rgba(22, 34, 40, 0.88);
-  --theme-button-border: rgba(180, 206, 196, 0.16);
-  --chart-grid: rgba(180, 206, 196, 0.12);
-  --chart-line-cool: #79a9be;
-  --chart-line-cool-fill: rgba(121, 169, 190, 0.16);
-  --chart-line-warm: #e49b78;
-  --chart-line-warm-fill: rgba(228, 155, 120, 0.16);
-  --chart-bar-1: #79a9be;
-  --chart-bar-2: #e49b78;
-  --chart-bar-3: #dbb162;
-  --chart-bar-4: #5db1a1;
-  --chart-zip-bar: #dbb162;
-  --shadow: 0 28px 70px rgba(0, 0, 0, 0.35);
 }
 
 * {
@@ -188,30 +147,6 @@ a {
   font-size: 1.05rem;
 }
 
-.theme-switch {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-}
-
-.theme-toggle {
-  align-self: start;
-  border-radius: 999px;
-  border: 1px solid var(--theme-button-border);
-  background: var(--theme-button-bg);
-  color: var(--ink);
-  padding: 0.7rem 1rem;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform 180ms ease, background 180ms ease, border-color 180ms ease;
-}
-
-.theme-toggle:hover,
-.theme-toggle:focus-visible {
-  transform: translateY(-1px);
-}
-
 .controls {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -235,7 +170,7 @@ a {
 .chip,
 select {
   border-radius: 999px;
-  border: 1px solid var(--theme-button-border);
+  border: 1px solid rgba(23, 48, 42, 0.14);
   background: var(--surface);
   color: var(--ink);
   font: inherit;
