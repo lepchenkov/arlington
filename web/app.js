@@ -5,13 +5,10 @@ const state = {
   propertyType: "All",
   charts: {},
   map: null,
-  mapTileLayer: null,
-  mapTileTheme: null,
   heatLayer: null,
   mapReady: false,
   mapVisible: false,
   heatCache: new Map(),
-  theme: document.documentElement.dataset.theme || "light",
 };
 
 const currency = new Intl.NumberFormat("en-US", {
@@ -43,7 +40,6 @@ const quarterLabelFormatter = new Intl.DateTimeFormat("en-US", {
 
 const propertyTypeSelect = document.querySelector("#property-type");
 const windowControls = document.querySelector("#window-controls");
-const themeToggle = document.querySelector("#theme-toggle");
 
 boot().catch((error) => {
   console.error(error);
@@ -75,7 +71,6 @@ async function boot() {
   populatePropertyTypes(payload.propertyTypes);
   renderNotes(payload.notes);
   initializeCharts();
-  syncThemeUi();
   installMapLoader();
   render();
 }
@@ -98,7 +93,6 @@ function bindControls() {
     state.propertyType = event.target.value;
     render();
   });
-  themeToggle.addEventListener("click", toggleTheme);
 }
 
 function populateMeta(payload) {
@@ -159,9 +153,9 @@ function initializeMap() {
     zoomControl: false,
   }).setView([38.8816, -77.091], 12);
 
-  state.mapTileLayer = createMapTileLayer(state.theme);
-  state.mapTileLayer.addTo(map);
-  state.mapTileTheme = state.theme;
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+    attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+  }).addTo(map);
 
   L.control
     .zoom({
@@ -268,31 +262,28 @@ function renderStats(records) {
 }
 
 function renderTransactionChart(records) {
-  const theme = getThemePalette();
   const grouped = groupBy(records, "saleMonth");
   const labels = Array.from(grouped.keys()).sort();
   const values = labels.map((label) => grouped.get(label).length);
 
   updateLineChart(state.charts.transactions, labels, values, {
-    borderColor: theme.lineCool,
-    backgroundColor: theme.lineCoolFill,
+    borderColor: "#365b74",
+    backgroundColor: "rgba(54, 91, 116, 0.16)",
   }, (label) => monthLabelFormatter.format(new Date(`${label}-01T00:00:00`)));
 }
 
 function renderPriceChart(records) {
-  const theme = getThemePalette();
   const grouped = groupBy(records, "saleQuarter");
   const labels = Array.from(grouped.keys()).sort();
   const values = labels.map((label) => median(grouped.get(label).map((record) => record.saleAmount)));
 
   updateLineChart(state.charts.price, labels, values, {
-    borderColor: theme.lineWarm,
-    backgroundColor: theme.lineWarmFill,
+    borderColor: "#be6139",
+    backgroundColor: "rgba(190, 97, 57, 0.16)",
   }, (label) => quarterLabel(label));
 }
 
 function renderMixChart(records) {
-  const theme = getThemePalette();
   const counts = countBy(records, "propertyType");
   const labels = Array.from(counts.keys());
   const values = labels.map((label) => counts.get(label));
@@ -303,14 +294,13 @@ function renderMixChart(records) {
       label: "Transactions",
       data: values,
       borderRadius: 12,
-      backgroundColor: [theme.bar1, theme.bar2, theme.bar3, theme.bar4],
+      backgroundColor: ["#365b74", "#be6139", "#d3a14a", "#2f7668"],
     },
   ];
   state.charts.mix.update();
 }
 
 function renderZipChart(records) {
-  const theme = getThemePalette();
   const grouped = groupBy(records, "zipCode");
   const zips = Array.from(grouped.entries())
     .filter(([, items]) => items.length >= 12)
@@ -327,7 +317,7 @@ function renderZipChart(records) {
       label: "Median sale price",
       data: zips.map((item) => item.median),
       borderRadius: 12,
-      backgroundColor: theme.zipBar,
+      backgroundColor: "#d3a14a",
     },
   ];
   state.charts.zip.update();
@@ -394,7 +384,6 @@ function buildHeatGrid(records) {
 }
 
 function sharedLineOptions(label, currencyAxis = false) {
-  const theme = getThemePalette();
   return {
     responsive: true,
     maintainAspectRatio: false,
@@ -422,7 +411,7 @@ function sharedLineOptions(label, currencyAxis = false) {
     scales: {
       x: {
         ticks: {
-          color: theme.muted,
+          color: "#597169",
           maxTicksLimit: 8,
         },
         grid: {
@@ -431,13 +420,13 @@ function sharedLineOptions(label, currencyAxis = false) {
       },
       y: {
         ticks: {
-          color: theme.muted,
+          color: "#597169",
           callback(value) {
             return currencyAxis ? compactNumber.format(value) : value;
           },
         },
         grid: {
-          color: theme.grid,
+          color: "rgba(23, 48, 42, 0.08)",
         },
       },
     },
@@ -445,7 +434,6 @@ function sharedLineOptions(label, currencyAxis = false) {
 }
 
 function sharedBarOptions() {
-  const theme = getThemePalette();
   return {
     responsive: true,
     maintainAspectRatio: false,
@@ -465,19 +453,18 @@ function sharedBarOptions() {
     },
     scales: {
       x: {
-        ticks: { color: theme.muted },
+        ticks: { color: "#597169" },
         grid: { display: false },
       },
       y: {
-        ticks: { color: theme.muted },
-        grid: { color: theme.grid },
+        ticks: { color: "#597169" },
+        grid: { color: "rgba(23, 48, 42, 0.08)" },
       },
     },
   };
 }
 
 function sharedHorizontalBarOptions() {
-  const theme = getThemePalette();
   return {
     indexAxis: "y",
     responsive: true,
@@ -499,15 +486,15 @@ function sharedHorizontalBarOptions() {
     scales: {
       x: {
         ticks: {
-          color: theme.muted,
+          color: "#597169",
           callback(value) {
             return compactNumber.format(value);
           },
         },
-        grid: { color: theme.grid },
+        grid: { color: "rgba(23, 48, 42, 0.08)" },
       },
       y: {
-        ticks: { color: theme.muted },
+        ticks: { color: "#597169" },
         grid: { display: false },
       },
     },
@@ -529,81 +516,6 @@ function updateLineChart(chart, rawLabels, rawValues, palette, labelFormatter) {
     },
   ];
   chart.update();
-}
-
-function syncThemeUi() {
-  const nextLabel = state.theme === "dark" ? "Light mode" : "Dark mode";
-  themeToggle.textContent = nextLabel;
-  themeToggle.setAttribute("aria-pressed", String(state.theme === "dark"));
-}
-
-function toggleTheme() {
-  state.theme = state.theme === "dark" ? "light" : "dark";
-  document.documentElement.dataset.theme = state.theme;
-  try {
-    localStorage.setItem("arlington-theme", state.theme);
-  } catch {
-    // Ignore storage failures and keep the active in-memory theme.
-  }
-  syncThemeUi();
-  syncChartTheme();
-  syncMapTheme();
-  render();
-}
-
-function getThemePalette() {
-  const styles = getComputedStyle(document.documentElement);
-  return {
-    muted: styles.getPropertyValue("--muted").trim(),
-    grid: styles.getPropertyValue("--chart-grid").trim(),
-    lineCool: styles.getPropertyValue("--chart-line-cool").trim(),
-    lineCoolFill: styles.getPropertyValue("--chart-line-cool-fill").trim(),
-    lineWarm: styles.getPropertyValue("--chart-line-warm").trim(),
-    lineWarmFill: styles.getPropertyValue("--chart-line-warm-fill").trim(),
-    bar1: styles.getPropertyValue("--chart-bar-1").trim(),
-    bar2: styles.getPropertyValue("--chart-bar-2").trim(),
-    bar3: styles.getPropertyValue("--chart-bar-3").trim(),
-    bar4: styles.getPropertyValue("--chart-bar-4").trim(),
-    zipBar: styles.getPropertyValue("--chart-zip-bar").trim(),
-  };
-}
-
-function syncChartTheme() {
-  if (!state.charts.transactions) {
-    return;
-  }
-
-  state.charts.transactions.options = sharedLineOptions("Transactions");
-  state.charts.price.options = sharedLineOptions("Median price", true);
-  state.charts.mix.options = sharedBarOptions();
-  state.charts.zip.options = sharedHorizontalBarOptions();
-}
-
-function createMapTileLayer(theme) {
-  const url =
-    theme === "dark"
-      ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-      : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
-
-  return L.tileLayer(url, {
-    attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-  });
-}
-
-function syncMapTheme() {
-  if (!state.mapReady || state.mapTileTheme === state.theme) {
-    return;
-  }
-
-  if (state.mapTileLayer) {
-    state.map.removeLayer(state.mapTileLayer);
-  }
-  state.mapTileLayer = createMapTileLayer(state.theme);
-  state.mapTileLayer.addTo(state.map);
-  state.mapTileTheme = state.theme;
-  if (state.heatLayer?.bringToFront) {
-    state.heatLayer.bringToFront();
-  }
 }
 
 function groupBy(records, key) {

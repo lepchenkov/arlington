@@ -3,23 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="light dark" />
     <title>Arlington Housing Pulse</title>
     <meta
       name="description"
       content="A static GitHub Pages dashboard for Arlington County residential sales, powered by county open data JSON."
     />
-    <script>
-      (() => {
-        try {
-          const stored = localStorage.getItem("arlington-theme");
-          const theme = stored || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-          document.documentElement.dataset.theme = theme;
-        } catch {
-          document.documentElement.dataset.theme = "light";
-        }
-      })();
-    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -58,10 +46,6 @@
           <div>
             <span class="meta-label">Source</span>
             <a id="source-link" href="#" target="_blank" rel="noreferrer">County API</a>
-          </div>
-          <div class="theme-switch">
-            <span class="meta-label">Theme</span>
-            <button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false">Dark mode</button>
           </div>
         </div>
       </header>
