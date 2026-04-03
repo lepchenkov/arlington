@@ -9,7 +9,10 @@ const state = {
   mapReady: false,
   mapVisible: false,
   heatCache: new Map(),
+  theme: "light",
 };
+
+const THEME_STORAGE_KEY = "ahp-theme";
 
 const currency = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -40,6 +43,7 @@ const quarterLabelFormatter = new Intl.DateTimeFormat("en-US", {
 
 const propertyTypeSelect = document.querySelector("#property-type");
 const windowControls = document.querySelector("#window-controls");
+const themeToggle = document.querySelector("#theme-toggle");
 
 boot().catch((error) => {
   console.error(error);
@@ -47,6 +51,7 @@ boot().catch((error) => {
 });
 
 async function boot() {
+  initializeTheme();
   installRevealAnimation();
   bindControls();
 
@@ -71,6 +76,7 @@ async function boot() {
   populatePropertyTypes(payload.propertyTypes);
   renderNotes(payload.notes);
   initializeCharts();
+  refreshChartTheme();
   installMapLoader();
   render();
 }
@@ -154,7 +160,7 @@ function initializeMap() {
   }).setView([38.8816, -77.091], 12);
 
   L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-    attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+    attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
   }).addTo(map);
 
   L.control
@@ -245,12 +251,12 @@ function renderStats(records) {
   const count = records.length;
   const amounts = records.map((record) => record.saleAmount).sort((left, right) => left - right);
   const totalVolume = amounts.reduce((sum, value) => sum + value, 0);
-  const median = amounts.length ? amounts[Math.floor(amounts.length / 2)] : 0;
+  const medianValue = amounts.length ? amounts[Math.floor(amounts.length / 2)] : 0;
   const latestRecord = records[0];
 
   setText("#transactions-value", count.toLocaleString("en-US"));
   setText("#transactions-foot", `${state.windowYears}-year transaction count`);
-  setText("#median-value", amounts.length ? currency.format(median) : "-");
+  setText("#median-value", amounts.length ? currency.format(medianValue) : "-");
   setText("#median-foot", "50th percentile recorded sale");
   setText("#volume-value", compactNumber.format(totalVolume));
   setText("#volume-foot", `${currency.format(totalVolume)} in total volume`);
@@ -265,28 +271,44 @@ function renderTransactionChart(records) {
   const grouped = groupBy(records, "saleMonth");
   const labels = Array.from(grouped.keys()).sort();
   const values = labels.map((label) => grouped.get(label).length);
+  const styles = getThemeStyles();
 
-  updateLineChart(state.charts.transactions, labels, values, {
-    borderColor: "#365b74",
-    backgroundColor: "rgba(54, 91, 116, 0.16)",
-  }, (label) => monthLabelFormatter.format(new Date(`${label}-01T00:00:00`)));
+  updateLineChart(
+    state.charts.transactions,
+    labels,
+    values,
+    {
+      borderColor: readCssVar(styles, "--chart-line-cool", "#365b74"),
+      backgroundColor: readCssVar(styles, "--chart-line-cool-fill", "rgba(54, 91, 116, 0.16)"),
+    },
+    (label) => monthLabelFormatter.format(new Date(`${label}-01T00:00:00`)),
+  );
 }
 
 function renderPriceChart(records) {
   const grouped = groupBy(records, "saleQuarter");
   const labels = Array.from(grouped.keys()).sort();
   const values = labels.map((label) => median(grouped.get(label).map((record) => record.saleAmount)));
+  const styles = getThemeStyles();
 
-  updateLineChart(state.charts.price, labels, values, {
-    borderColor: "#be6139",
-    backgroundColor: "rgba(190, 97, 57, 0.16)",
-  }, (label) => quarterLabel(label));
+  updateLineChart(
+    state.charts.price,
+    labels,
+    values,
+    {
+      borderColor: readCssVar(styles, "--chart-line-warm", "#be6139"),
+      backgroundColor: readCssVar(styles, "--chart-line-warm-fill", "rgba(190, 97, 57, 0.16)"),
+    },
+    (label) => quarterLabel(label),
+  );
 }
 
 function renderMixChart(records) {
   const counts = countBy(records, "propertyType");
   const labels = Array.from(counts.keys());
   const values = labels.map((label) => counts.get(label));
+  const styles = getThemeStyles();
+  const colors = buildBarPalette(values.length, styles);
 
   state.charts.mix.data.labels = labels;
   state.charts.mix.data.datasets = [
@@ -294,7 +316,7 @@ function renderMixChart(records) {
       label: "Transactions",
       data: values,
       borderRadius: 12,
-      backgroundColor: ["#365b74", "#be6139", "#d3a14a", "#2f7668"],
+      backgroundColor: colors,
     },
   ];
   state.charts.mix.update();
@@ -310,6 +332,8 @@ function renderZipChart(records) {
     }))
     .sort((left, right) => right.median - left.median)
     .slice(0, 7);
+  const styles = getThemeStyles();
+  const barColor = readCssVar(styles, "--chart-zip-bar", "#d3a14a");
 
   state.charts.zip.data.labels = zips.map((item) => item.zip);
   state.charts.zip.data.datasets = [
@@ -317,7 +341,7 @@ function renderZipChart(records) {
       label: "Median sale price",
       data: zips.map((item) => item.median),
       borderRadius: 12,
-      backgroundColor: "#d3a14a",
+      backgroundColor: barColor,
     },
   ];
   state.charts.zip.update();
@@ -384,6 +408,10 @@ function buildHeatGrid(records) {
 }
 
 function sharedLineOptions(label, currencyAxis = false) {
+  const styles = getThemeStyles();
+  const muted = readCssVar(styles, "--muted", "#597169");
+  const gridColor = readCssVar(styles, "--chart-grid", "rgba(23, 48, 42, 0.08)");
+
   return {
     responsive: true,
     maintainAspectRatio: false,
@@ -411,7 +439,7 @@ function sharedLineOptions(label, currencyAxis = false) {
     scales: {
       x: {
         ticks: {
-          color: "#597169",
+          color: muted,
           maxTicksLimit: 8,
         },
         grid: {
@@ -420,13 +448,13 @@ function sharedLineOptions(label, currencyAxis = false) {
       },
       y: {
         ticks: {
-          color: "#597169",
+          color: muted,
           callback(value) {
             return currencyAxis ? compactNumber.format(value) : value;
           },
         },
         grid: {
-          color: "rgba(23, 48, 42, 0.08)",
+          color: gridColor,
         },
       },
     },
@@ -434,6 +462,10 @@ function sharedLineOptions(label, currencyAxis = false) {
 }
 
 function sharedBarOptions() {
+  const styles = getThemeStyles();
+  const muted = readCssVar(styles, "--muted", "#597169");
+  const gridColor = readCssVar(styles, "--chart-grid", "rgba(23, 48, 42, 0.08)");
+
   return {
     responsive: true,
     maintainAspectRatio: false,
@@ -453,18 +485,22 @@ function sharedBarOptions() {
     },
     scales: {
       x: {
-        ticks: { color: "#597169" },
+        ticks: { color: muted },
         grid: { display: false },
       },
       y: {
-        ticks: { color: "#597169" },
-        grid: { color: "rgba(23, 48, 42, 0.08)" },
+        ticks: { color: muted },
+        grid: { color: gridColor },
       },
     },
   };
 }
 
 function sharedHorizontalBarOptions() {
+  const styles = getThemeStyles();
+  const muted = readCssVar(styles, "--muted", "#597169");
+  const gridColor = readCssVar(styles, "--chart-grid", "rgba(23, 48, 42, 0.08)");
+
   return {
     indexAxis: "y",
     responsive: true,
@@ -486,15 +522,15 @@ function sharedHorizontalBarOptions() {
     scales: {
       x: {
         ticks: {
-          color: "#597169",
+          color: muted,
           callback(value) {
             return compactNumber.format(value);
           },
         },
-        grid: { color: "rgba(23, 48, 42, 0.08)" },
+        grid: { color: gridColor },
       },
       y: {
-        ticks: { color: "#597169" },
+        ticks: { color: muted },
         grid: { display: false },
       },
     },
@@ -571,4 +607,118 @@ function installRevealAnimation() {
   for (const element of document.querySelectorAll(".reveal")) {
     observer.observe(element);
   }
+}
+
+function initializeTheme() {
+  const storedTheme = readStoredTheme();
+  const mediaQuery = typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+  const initialMode = storedTheme || (mediaQuery && mediaQuery.matches ? "dark" : "light");
+  applyTheme(initialMode, { suppressRender: true });
+
+  themeToggle?.addEventListener("click", () => {
+    const next = state.theme === "dark" ? "light" : "dark";
+    applyTheme(next);
+    persistTheme(next);
+  });
+
+  if (mediaQuery) {
+    const handleChange = (event) => {
+      if (readStoredTheme()) {
+        return;
+      }
+      applyTheme(event.matches ? "dark" : "light");
+    };
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", handleChange);
+    } else if (typeof mediaQuery.addListener === "function") {
+      mediaQuery.addListener(handleChange);
+    }
+  }
+}
+
+function applyTheme(mode, options = {}) {
+  const nextTheme = mode === "dark" ? "dark" : "light";
+  const changed = state.theme !== nextTheme;
+  state.theme = nextTheme;
+  document.body.classList.toggle("theme-dark", nextTheme === "dark");
+  updateThemeToggle(nextTheme);
+
+  if (changed && !options.suppressRender && state.charts.transactions) {
+    refreshChartTheme();
+    render();
+  }
+}
+
+function updateThemeToggle(mode) {
+  if (!themeToggle) {
+    return;
+  }
+  const isDark = mode === "dark";
+  themeToggle.textContent = isDark ? "Light mode" : "Dark mode";
+  themeToggle.setAttribute("aria-pressed", String(isDark));
+}
+
+function readStoredTheme() {
+  try {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    return stored === "dark" || stored === "light" ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistTheme(mode) {
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, mode);
+  } catch {
+    // Ignore write failures (e.g., private mode)
+  }
+}
+
+function refreshChartTheme() {
+  if (!state.charts.transactions) {
+    return;
+  }
+
+  const styles = getThemeStyles();
+  const muted = readCssVar(styles, "--muted", "#597169");
+  const gridColor = readCssVar(styles, "--chart-grid", "rgba(23, 48, 42, 0.08)");
+
+  for (const chart of [state.charts.transactions, state.charts.price]) {
+    if (!chart) {
+      continue;
+    }
+    chart.options.scales.x.ticks.color = muted;
+    chart.options.scales.y.ticks.color = muted;
+    chart.options.scales.y.grid.color = gridColor;
+  }
+
+  if (state.charts.mix) {
+    state.charts.mix.options.scales.x.ticks.color = muted;
+    state.charts.mix.options.scales.y.ticks.color = muted;
+    state.charts.mix.options.scales.y.grid.color = gridColor;
+  }
+
+  if (state.charts.zip) {
+    state.charts.zip.options.scales.x.ticks.color = muted;
+    state.charts.zip.options.scales.x.grid.color = gridColor;
+    state.charts.zip.options.scales.y.ticks.color = muted;
+  }
+}
+
+function buildBarPalette(length, styles = getThemeStyles()) {
+  const fallbackPalette = ["#365b74", "#be6139", "#d3a14a", "#2f7668"];
+  const vars = ["--chart-bar-1", "--chart-bar-2", "--chart-bar-3", "--chart-bar-4"];
+  const resolved = vars.map((name, index) => readCssVar(styles, name, fallbackPalette[index]));
+  return Array.from({ length }, (_, index) => resolved[index % resolved.length]);
+}
+
+function getThemeStyles() {
+  return getComputedStyle(document.documentElement);
+}
+
+function readCssVar(styles, name, fallback = "") {
+  const value = styles.getPropertyValue(name).trim();
+  return value || fallback;
 }
