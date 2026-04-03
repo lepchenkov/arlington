@@ -1,6 +1,10 @@
 :root {
+  color-scheme: light;
   --bg: #f4ede3;
   --bg-deep: #f0e5d8;
+  --bg-accent-1: rgba(211, 161, 74, 0.18);
+  --bg-accent-2: rgba(190, 97, 57, 0.16);
+  --pattern-color: rgba(23, 48, 42, 0.015);
   --panel: rgba(255, 250, 244, 0.78);
   --panel-border: rgba(48, 56, 52, 0.09);
   --ink: #17302a;
@@ -9,7 +13,65 @@
   --accent-soft: #e8b08f;
   --accent-cool: #365b74;
   --accent-gold: #d3a14a;
+  --surface: rgba(255, 255, 255, 0.56);
+  --surface-strong: rgba(255, 255, 255, 0.44);
+  --surface-border: rgba(23, 48, 42, 0.08);
+  --section-border: rgba(23, 48, 42, 0.08);
+  --range-track-bg: rgba(23, 48, 42, 0.12);
+  --thumb-border: rgba(255, 255, 255, 0.9);
+  --thumb-shadow: 0 6px 18px rgba(54, 91, 116, 0.26);
+  --button-shadow: 0 14px 34px rgba(54, 91, 116, 0.2);
+  --theme-button-bg: rgba(255, 255, 255, 0.56);
+  --theme-button-border: rgba(23, 48, 42, 0.14);
+  --chart-grid: rgba(23, 48, 42, 0.08);
+  --chart-line-cool: #365b74;
+  --chart-line-cool-fill: rgba(54, 91, 116, 0.16);
+  --chart-line-warm: #be6139;
+  --chart-line-warm-fill: rgba(190, 97, 57, 0.16);
+  --chart-bar-1: #365b74;
+  --chart-bar-2: #be6139;
+  --chart-bar-3: #d3a14a;
+  --chart-bar-4: #2f7668;
+  --chart-zip-bar: #d3a14a;
   --shadow: 0 24px 60px rgba(43, 53, 48, 0.12);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #071115;
+  --bg-deep: #102026;
+  --bg-accent-1: rgba(211, 161, 74, 0.1);
+  --bg-accent-2: rgba(74, 127, 145, 0.16);
+  --pattern-color: rgba(214, 232, 223, 0.03);
+  --panel: rgba(15, 25, 30, 0.82);
+  --panel-border: rgba(180, 206, 196, 0.12);
+  --ink: #eef5f1;
+  --muted: #9fb5ac;
+  --accent: #dd845f;
+  --accent-soft: #e7a988;
+  --accent-cool: #79a9be;
+  --accent-gold: #dbb162;
+  --surface: rgba(20, 31, 37, 0.8);
+  --surface-strong: rgba(17, 27, 32, 0.9);
+  --surface-border: rgba(180, 206, 196, 0.12);
+  --section-border: rgba(180, 206, 196, 0.12);
+  --range-track-bg: rgba(180, 206, 196, 0.18);
+  --thumb-border: rgba(10, 17, 21, 0.92);
+  --thumb-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
+  --button-shadow: 0 14px 34px rgba(0, 0, 0, 0.32);
+  --theme-button-bg: rgba(22, 34, 40, 0.88);
+  --theme-button-border: rgba(180, 206, 196, 0.16);
+  --chart-grid: rgba(180, 206, 196, 0.12);
+  --chart-line-cool: #79a9be;
+  --chart-line-cool-fill: rgba(121, 169, 190, 0.16);
+  --chart-line-warm: #e49b78;
+  --chart-line-warm-fill: rgba(228, 155, 120, 0.16);
+  --chart-bar-1: #79a9be;
+  --chart-bar-2: #e49b78;
+  --chart-bar-3: #dbb162;
+  --chart-bar-4: #5db1a1;
+  --chart-zip-bar: #dbb162;
+  --shadow: 0 28px 70px rgba(0, 0, 0, 0.35);
 }
 
 * {
@@ -26,8 +88,8 @@ body {
   font-family: "Space Grotesk", sans-serif;
   color: var(--ink);
   background:
-    radial-gradient(circle at top left, rgba(211, 161, 74, 0.18), transparent 35%),
-    radial-gradient(circle at top right, rgba(190, 97, 57, 0.16), transparent 30%),
+    radial-gradient(circle at top left, var(--bg-accent-1), transparent 35%),
+    radial-gradient(circle at top right, var(--bg-accent-2), transparent 30%),
     linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
 }
 
@@ -37,8 +99,8 @@ body::before {
   inset: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(23, 48, 42, 0.015) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(23, 48, 42, 0.015) 1px, transparent 1px);
+    linear-gradient(var(--pattern-color) 1px, transparent 1px),
+    linear-gradient(90deg, var(--pattern-color) 1px, transparent 1px);
   background-size: 24px 24px;
   mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.6), transparent 95%);
 }
@@ -126,6 +188,30 @@ a {
   font-size: 1.05rem;
 }
 
+.theme-switch {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.theme-toggle {
+  align-self: start;
+  border-radius: 999px;
+  border: 1px solid var(--theme-button-border);
+  background: var(--theme-button-bg);
+  color: var(--ink);
+  padding: 0.7rem 1rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 180ms ease, background 180ms ease, border-color 180ms ease;
+}
+
+.theme-toggle:hover,
+.theme-toggle:focus-visible {
+  transform: translateY(-1px);
+}
+
 .controls {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -156,8 +242,8 @@ a {
   gap: 0.4rem;
   padding: 0.95rem 1rem;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.44);
-  border: 1px solid rgba(23, 48, 42, 0.08);
+  background: var(--surface-strong);
+  border: 1px solid var(--surface-border);
 }
 
 .export-value-card strong {
@@ -182,7 +268,7 @@ a {
 .range-track {
   left: 0;
   right: 0;
-  background: rgba(23, 48, 42, 0.12);
+  background: var(--range-track-bg);
 }
 
 .range-track-fill {
@@ -217,9 +303,9 @@ a {
   height: 22px;
   margin-top: -7px;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.9);
+  border: 2px solid var(--thumb-border);
   background: var(--accent-cool);
-  box-shadow: 0 6px 18px rgba(54, 91, 116, 0.26);
+  box-shadow: var(--thumb-shadow);
   pointer-events: auto;
   cursor: pointer;
 }
@@ -228,9 +314,9 @@ a {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.9);
+  border: 2px solid var(--thumb-border);
   background: var(--accent-cool);
-  box-shadow: 0 6px 18px rgba(54, 91, 116, 0.26);
+  box-shadow: var(--thumb-shadow);
   pointer-events: auto;
   cursor: pointer;
 }
@@ -255,7 +341,7 @@ a {
   font-weight: 700;
   color: white;
   background: linear-gradient(135deg, var(--accent-cool), #4a7f91);
-  box-shadow: 0 14px 34px rgba(54, 91, 116, 0.2);
+  box-shadow: var(--button-shadow);
   cursor: pointer;
   transition: transform 180ms ease, opacity 180ms ease;
 }
@@ -286,8 +372,8 @@ a {
 .chip,
 select {
   border-radius: 999px;
-  border: 1px solid rgba(23, 48, 42, 0.14);
-  background: rgba(255, 255, 255, 0.56);
+  border: 1px solid var(--theme-button-border);
+  background: var(--surface);
   color: var(--ink);
   font: inherit;
 }
@@ -413,6 +499,7 @@ canvas {
   height: 520px;
   border-radius: 18px;
   overflow: hidden;
+  background: var(--surface);
 }
 
 .sales-list {
@@ -424,7 +511,7 @@ canvas {
   display: grid;
   gap: 0.2rem;
   padding: 0.9rem 0;
-  border-top: 1px solid rgba(23, 48, 42, 0.08);
+  border-top: 1px solid var(--section-border);
 }
 
 .sale-row:first-child {
@@ -463,6 +550,18 @@ canvas {
 
 .leaflet-control-attribution {
   font-family: "Space Grotesk", sans-serif;
+}
+
+.leaflet-bar a,
+.leaflet-control-attribution {
+  background: var(--panel) !important;
+  color: var(--ink) !important;
+  border-color: var(--panel-border) !important;
+}
+
+.leaflet-bar a:hover,
+.leaflet-bar a:focus {
+  background: var(--surface) !important;
 }
 
 .reveal {
