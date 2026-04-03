@@ -220,143 +220,6 @@ a {
   margin-bottom: 1.4rem;
 }
 
-.export-panel {
-  padding: 1.3rem;
-  margin-bottom: 1rem;
-}
-
-.export-head {
-  margin-bottom: 1.25rem;
-}
-
-.export-range-values {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.export-value-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  padding: 0.95rem 1rem;
-  border-radius: 18px;
-  background: var(--surface-strong);
-  border: 1px solid var(--surface-border);
-}
-
-.export-value-card strong {
-  font-size: 1.1rem;
-}
-
-.range-stack {
-  position: relative;
-  height: 56px;
-  margin-bottom: 1rem;
-}
-
-.range-track,
-.range-track-fill {
-  position: absolute;
-  top: 50%;
-  height: 8px;
-  border-radius: 999px;
-  transform: translateY(-50%);
-}
-
-.range-track {
-  left: 0;
-  right: 0;
-  background: var(--range-track-bg);
-}
-
-.range-track-fill {
-  left: 0;
-  width: 100%;
-  background: linear-gradient(135deg, var(--accent), var(--accent-gold));
-}
-
-.range-input {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  margin: 0;
-  appearance: none;
-  background: none;
-  pointer-events: none;
-}
-
-.range-input::-webkit-slider-runnable-track {
-  height: 8px;
-  background: transparent;
-}
-
-.range-input::-moz-range-track {
-  height: 8px;
-  background: transparent;
-}
-
-.range-input::-webkit-slider-thumb {
-  appearance: none;
-  width: 22px;
-  height: 22px;
-  margin-top: -7px;
-  border-radius: 50%;
-  border: 2px solid var(--thumb-border);
-  background: var(--accent-cool);
-  box-shadow: var(--thumb-shadow);
-  pointer-events: auto;
-  cursor: pointer;
-}
-
-.range-input::-moz-range-thumb {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 2px solid var(--thumb-border);
-  background: var(--accent-cool);
-  box-shadow: var(--thumb-shadow);
-  pointer-events: auto;
-  cursor: pointer;
-}
-
-.export-actions {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  align-items: center;
-}
-
-.export-count {
-  margin: 0;
-  color: var(--muted);
-}
-
-.export-button {
-  border: 0;
-  border-radius: 999px;
-  padding: 0.9rem 1.25rem;
-  font: inherit;
-  font-weight: 700;
-  color: white;
-  background: linear-gradient(135deg, var(--accent-cool), #4a7f91);
-  box-shadow: var(--button-shadow);
-  cursor: pointer;
-  transition: transform 180ms ease, opacity 180ms ease;
-}
-
-.export-button:hover,
-.export-button:focus-visible {
-  transform: translateY(-1px);
-}
-
-.export-button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  transform: none;
-}
-
 .control-block {
   display: flex;
   flex-direction: column;
@@ -578,7 +441,6 @@ canvas {
 @media (max-width: 1080px) {
   .hero,
   .controls,
-  .export-range-values,
   .stats-grid,
   .chart-grid,
   .detail-grid {
@@ -607,16 +469,10 @@ canvas {
   .chart-grid .panel,
   .detail-grid .panel,
   .map-section,
-  .export-panel,
   .controls,
   .hero-meta,
   .stat-card {
     border-radius: 20px;
-  }
-
-  .export-actions {
-    flex-direction: column;
-    align-items: stretch;
   }
 
   #sales-map {
