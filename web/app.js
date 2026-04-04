@@ -10,6 +10,11 @@ const state = {
   mapVisible: false,
   heatCache: new Map(),
   theme: "light",
+  dateRange: {
+    min: null,
+    max: null,
+    selection: null,
+  },
 };
 
 const THEME_STORAGE_KEY = "ahp-theme";
@@ -44,6 +49,12 @@ const quarterLabelFormatter = new Intl.DateTimeFormat("en-US", {
 const propertyTypeSelect = document.querySelector("#property-type");
 const windowControls = document.querySelector("#window-controls");
 const themeToggle = document.querySelector("#theme-toggle");
+const saleRangeSlider = document.querySelector("#sale-date-slider");
+const saleRangeStart = document.querySelector("#sale-range-start");
+const saleRangeEnd = document.querySelector("#sale-range-end");
+const exportButton = document.querySelector("#export-button");
+
+let suppressSliderRender = false;
 
 boot().catch((error) => {
   console.error(error);
@@ -67,6 +78,7 @@ async function boot() {
     return {
       ...record,
       saleDate,
+      saleDateText: record.saleDate,
       saleMonth: `${saleDate.getFullYear()}-${String(saleDate.getMonth() + 1).padStart(2, "0")}`,
       saleQuarter: `${saleDate.getFullYear()}-Q${Math.floor(saleDate.getMonth() / 3) + 1}`,
     };
@@ -76,6 +88,7 @@ async function boot() {
   populatePropertyTypes(payload.propertyTypes);
   renderNotes(payload.notes);
   initializeCharts();
+  setupSaleRange();
   refreshChartTheme();
   installMapLoader();
   render();
@@ -89,15 +102,17 @@ function bindControls() {
     }
 
     state.windowYears = Number(button.dataset.window);
-    for (const item of windowControls.querySelectorAll(".chip")) {
-      item.classList.toggle("is-active", item === button);
-    }
-    render();
+    activateWindowChip(button);
+    applyWindowPreset();
   });
 
   propertyTypeSelect.addEventListener("change", (event) => {
     state.propertyType = event.target.value;
     render();
+  });
+
+  exportButton?.addEventListener("click", () => {
+    void handleExportClick();
   });
 }
 
@@ -223,12 +238,16 @@ function render() {
 }
 
 function getFilteredRecords() {
-  const latestDate = getLatestDate();
-  const threshold = new Date(latestDate);
-  threshold.setFullYear(threshold.getFullYear() - state.windowYears);
+  const [rangeStart, rangeEnd] = getActiveDateBounds();
+  if (!rangeStart || !rangeEnd) {
+    return [];
+  }
+
+  const startTime = rangeStart.getTime();
+  const endTime = rangeEnd.getTime();
 
   return state.records.filter((record) => {
-    if (record.saleDate < threshold) {
+    if (record.saleDate.getTime() < startTime || record.saleDate.getTime() > endTime) {
       return false;
     }
     if (state.propertyType !== "All" && record.propertyType !== state.propertyType) {
@@ -239,12 +258,23 @@ function getFilteredRecords() {
 }
 
 function getLatestDate() {
-  return state.records.reduce((latest, record) => {
-    if (!latest || record.saleDate > latest) {
+  if (state.dateRange.max) {
+    return state.dateRange.max;
+  }
+  if (!state.records.length) {
+    return null;
+  }
+  const latest = state.records.reduce((current, record) => {
+    if (!current || record.saleDate > current) {
       return record.saleDate;
     }
-    return latest;
+    return current;
   }, null);
+  if (!latest) {
+    return null;
+  }
+  state.dateRange.max = new Date(latest.getTime());
+  return state.dateRange.max;
 }
 
 function renderStats(records) {
@@ -253,9 +283,11 @@ function renderStats(records) {
   const totalVolume = amounts.reduce((sum, value) => sum + value, 0);
   const medianValue = amounts.length ? amounts[Math.floor(amounts.length / 2)] : 0;
   const latestRecord = records[0];
+  const [rangeStart, rangeEnd] = getActiveDateBounds();
+  const rangeLabel = formatRangeLabel(rangeStart, rangeEnd);
 
   setText("#transactions-value", count.toLocaleString("en-US"));
-  setText("#transactions-foot", `${state.windowYears}-year transaction count`);
+  setText("#transactions-foot", rangeLabel ? `Transactions from ${rangeLabel}` : "Transactions");
   setText("#median-value", amounts.length ? currency.format(medianValue) : "-");
   setText("#median-foot", "50th percentile recorded sale");
   setText("#volume-value", compactNumber.format(totalVolume));
@@ -378,7 +410,8 @@ function renderMap(records) {
 }
 
 function buildHeatGrid(records) {
-  const cacheKey = `${state.windowYears}:${state.propertyType}:${records.length}`;
+  const [rangeStart, rangeEnd] = getActiveDateBounds();
+  const cacheKey = `${state.propertyType}:${rangeStart ? rangeStart.toISOString() : "na"}:${rangeEnd ? rangeEnd.toISOString() : "na"}:${records.length}`;
   if (state.heatCache.has(cacheKey)) {
     return state.heatCache.get(cacheKey);
   }
@@ -721,4 +754,260 @@ function getThemeStyles() {
 function readCssVar(styles, name, fallback = "") {
   const value = styles.getPropertyValue(name).trim();
   return value || fallback;
+}
+
+function setupSaleRange() {
+  if (!state.records.length) {
+    return;
+  }
+
+  const minDate = getEarliestDate();
+  const maxDate = getLatestDate();
+  if (!minDate || !maxDate) {
+    return;
+  }
+
+  const start = calculateWindowStart(minDate, maxDate);
+  const end = new Date(maxDate.getTime());
+  state.dateRange.selection = [start, end];
+  updateRangeLabels(start, end);
+
+  if (!saleRangeSlider || typeof window === "undefined" || !window.noUiSlider || minDate.getTime() === maxDate.getTime()) {
+    return;
+  }
+
+  if (saleRangeSlider.noUiSlider) {
+    saleRangeSlider.noUiSlider.destroy();
+  }
+
+  const slider = window.noUiSlider.create(saleRangeSlider, {
+    start: [start.getTime(), end.getTime()],
+    connect: true,
+    step: 24 * 60 * 60 * 1000,
+    range: {
+      min: minDate.getTime(),
+      max: maxDate.getTime(),
+    },
+    behaviour: "drag",
+  });
+
+  slider.on("update", (values) => {
+    const [left, right] = values.map((value) => new Date(Number(value)));
+    updateRangeLabels(left, right);
+  });
+
+  slider.on("set", (values) => {
+    const [left, right] = values.map((value) => new Date(Number(value)));
+    state.dateRange.selection = [left, right];
+    if (suppressSliderRender) {
+      suppressSliderRender = false;
+      return;
+    }
+    clearWindowSelection();
+    render();
+  });
+}
+
+function activateWindowChip(activeButton) {
+  for (const item of windowControls.querySelectorAll(".chip")) {
+    item.classList.toggle("is-active", item === activeButton);
+  }
+}
+
+function clearWindowSelection() {
+  for (const item of windowControls.querySelectorAll(".chip")) {
+    item.classList.remove("is-active");
+  }
+}
+
+function applyWindowPreset() {
+  const latest = getLatestDate();
+  const minDate = getEarliestDate();
+  if (!latest || !minDate) {
+    return;
+  }
+
+  const start = calculateWindowStart(minDate, latest);
+  const end = new Date(latest.getTime());
+  state.dateRange.selection = [start, end];
+  updateRangeLabels(start, end);
+  setSliderRange(start, end, { suppressRender: true });
+  render();
+}
+
+function setSliderRange(start, end, options = {}) {
+  if (!saleRangeSlider?.noUiSlider) {
+    return;
+  }
+  if (options.suppressRender) {
+    suppressSliderRender = true;
+  }
+  saleRangeSlider.noUiSlider.set([start.getTime(), end.getTime()]);
+}
+
+function calculateWindowStart(minDate, maxDate) {
+  const start = new Date(maxDate.getTime());
+  start.setFullYear(start.getFullYear() - state.windowYears);
+  if (start < minDate) {
+    start.setTime(minDate.getTime());
+  }
+  return start;
+}
+
+function getEarliestDate() {
+  if (state.dateRange.min) {
+    return state.dateRange.min;
+  }
+  if (!state.records.length) {
+    return null;
+  }
+  const earliest = state.records.reduce((current, record) => {
+    if (!current || record.saleDate < current) {
+      return record.saleDate;
+    }
+    return current;
+  }, null);
+  if (!earliest) {
+    return null;
+  }
+  state.dateRange.min = new Date(earliest.getTime());
+  return state.dateRange.min;
+}
+
+function getActiveDateBounds() {
+  if (state.dateRange.selection) {
+    return state.dateRange.selection;
+  }
+  const latest = getLatestDate();
+  const earliest = getEarliestDate();
+  if (!latest || !earliest) {
+    return [null, null];
+  }
+  const start = calculateWindowStart(earliest, latest);
+  const end = new Date(latest.getTime());
+  state.dateRange.selection = [start, end];
+  updateRangeLabels(start, end);
+  return state.dateRange.selection;
+}
+
+function updateRangeLabels(start, end) {
+  if (saleRangeStart && start) {
+    saleRangeStart.textContent = dateFormatter.format(start);
+  }
+  if (saleRangeEnd && end) {
+    saleRangeEnd.textContent = dateFormatter.format(end);
+  }
+}
+
+function formatRangeLabel(start, end) {
+  if (!start || !end) {
+    return null;
+  }
+  return `${dateFormatter.format(start)} – ${dateFormatter.format(end)}`;
+}
+
+async function handleExportClick() {
+  if (!exportButton || exportButton.disabled) {
+    return;
+  }
+  const originalText = exportButton.textContent;
+  exportButton.disabled = true;
+
+  const records = getFilteredRecords();
+  if (!records.length) {
+    exportButton.textContent = "No data to export";
+    await wait(1400);
+    exportButton.textContent = originalText;
+    exportButton.disabled = false;
+    return;
+  }
+
+  exportButton.textContent = "Preparing CSV...";
+  try {
+    await exportRecordsAsCsv(records);
+    exportButton.textContent = "Download ready";
+    await wait(1400);
+  } catch (error) {
+    console.error(error);
+    exportButton.textContent = "Export failed";
+    await wait(1600);
+  } finally {
+    exportButton.textContent = originalText;
+    exportButton.disabled = false;
+  }
+}
+
+async function exportRecordsAsCsv(records) {
+  const header = ["Address", "Sale date", "Sale amount", "Property type", "ZIP code", "Latitude", "Longitude"];
+  const parts = [`${header.join(",")}\n`];
+  const chunkSize = 2000;
+
+  for (let index = 0; index < records.length; index += chunkSize) {
+    const chunk = records.slice(index, index + chunkSize);
+    const body = chunk
+      .map((record) =>
+        [
+          record.address,
+          record.saleDateText,
+          record.saleAmount,
+          record.propertyType,
+          record.zipCode,
+          record.lat,
+          record.lon,
+        ]
+          .map(csvEscape)
+          .join(","),
+      )
+      .join("\n");
+    parts.push(body);
+    if (index + chunkSize < records.length) {
+      parts.push("\n");
+    }
+    await wait();
+  }
+
+  const blob = new Blob(parts, { type: "text/csv;charset=utf-8;" });
+  const [rangeStart, rangeEnd] = getActiveDateBounds();
+  const startLabel = formatYmd(rangeStart) || "start";
+  const endLabel = formatYmd(rangeEnd) || "end";
+  const filename = `transactions_${startLabel}_${endLabel}.csv`;
+  const url = URL.createObjectURL(blob);
+  triggerDownload(url, filename);
+}
+
+function csvEscape(value) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  const stringValue = String(value).replace(/"/g, '""');
+  if (/[",\n]/.test(stringValue)) {
+    return `"${stringValue}"`;
+  }
+  return stringValue;
+}
+
+function triggerDownload(url, filename) {
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+function wait(ms = 0) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function formatYmd(date) {
+  if (!date) {
+    return "";
+  }
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
 }
