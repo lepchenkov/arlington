@@ -38,6 +38,15 @@ const quarterLabelFormatter = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
 });
 
+const THEME_STORAGE_KEY = "ahp-theme";
+const THEMES = {
+  LIGHT: "light",
+  DARK: "dark",
+};
+let inMemoryThemePreference = null;
+
+setupTheme();
+
 boot().catch((error) => {
   console.error(error);
   document.querySelector("#generated-at").textContent = "Build failed";
@@ -584,4 +593,92 @@ function getThemeStyles() {
 function readCssVar(styles, name, fallback = "") {
   const value = styles.getPropertyValue(name).trim();
   return value || fallback;
+}
+
+function setupTheme() {
+  const storedTheme = normalizeTheme(getStoredTheme());
+  const initialTheme = storedTheme || detectPreferredTheme();
+  applyTheme(initialTheme);
+
+  const toggle = document.querySelector("#theme-toggle");
+  if (toggle) {
+    toggle.addEventListener("click", () => {
+      const nextTheme = getActiveTheme() === THEMES.DARK ? THEMES.LIGHT : THEMES.DARK;
+      applyTheme(nextTheme);
+      setStoredTheme(nextTheme);
+      refreshThemeVisuals();
+    });
+  }
+
+  const mediaQuery = typeof window.matchMedia === "function" ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+  if (!mediaQuery) {
+    return;
+  }
+
+  const mediaHandler = (event) => {
+    if (normalizeTheme(getStoredTheme())) {
+      return;
+    }
+    applyTheme(event.matches ? THEMES.DARK : THEMES.LIGHT);
+    refreshThemeVisuals();
+  };
+
+  if (typeof mediaQuery.addEventListener === "function") {
+    mediaQuery.addEventListener("change", mediaHandler);
+  } else if (typeof mediaQuery.addListener === "function") {
+    mediaQuery.addListener(mediaHandler);
+  }
+}
+
+function refreshThemeVisuals() {
+  if (state.charts.transactions) {
+    render();
+  }
+}
+
+function applyTheme(theme) {
+  const resolvedTheme = normalizeTheme(theme) || THEMES.LIGHT;
+  document.documentElement.setAttribute("data-theme", resolvedTheme);
+  const toggle = document.querySelector("#theme-toggle");
+  if (toggle) {
+    const isDark = resolvedTheme === THEMES.DARK;
+    toggle.setAttribute("aria-pressed", String(isDark));
+    toggle.textContent = isDark ? "Light mode" : "Dark mode";
+    toggle.setAttribute("aria-label", isDark ? "Switch to light mode" : "Switch to dark mode");
+  }
+}
+
+function getActiveTheme() {
+  return document.documentElement.getAttribute("data-theme") || THEMES.LIGHT;
+}
+
+function detectPreferredTheme() {
+  if (typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+    return THEMES.DARK;
+  }
+  return THEMES.LIGHT;
+}
+
+function getStoredTheme() {
+  try {
+    return localStorage.getItem(THEME_STORAGE_KEY) || inMemoryThemePreference;
+  } catch {
+    return inMemoryThemePreference;
+  }
+}
+
+function setStoredTheme(theme) {
+  inMemoryThemePreference = theme;
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+  } catch {
+    // Ignore storage failures
+  }
+}
+
+function normalizeTheme(theme) {
+  if (theme === THEMES.DARK || theme === THEMES.LIGHT) {
+    return theme;
+  }
+  return null;
 }
