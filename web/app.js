@@ -9,15 +9,12 @@ const state = {
   mapReady: false,
   mapVisible: false,
   heatCache: new Map(),
-  theme: "light",
   dateRange: {
     min: null,
     max: null,
     selection: null,
   },
 };
-
-const THEME_STORAGE_KEY = "ahp-theme";
 
 const currency = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -48,11 +45,9 @@ const quarterLabelFormatter = new Intl.DateTimeFormat("en-US", {
 
 const propertyTypeSelect = document.querySelector("#property-type");
 const windowControls = document.querySelector("#window-controls");
-const themeToggle = document.querySelector("#theme-toggle");
 const saleRangeSlider = document.querySelector("#sale-date-slider");
 const saleRangeStart = document.querySelector("#sale-range-start");
 const saleRangeEnd = document.querySelector("#sale-range-end");
-const exportButton = document.querySelector("#export-button");
 
 let suppressSliderRender = false;
 
@@ -62,7 +57,6 @@ boot().catch((error) => {
 });
 
 async function boot() {
-  initializeTheme();
   installRevealAnimation();
   bindControls();
 
@@ -89,7 +83,6 @@ async function boot() {
   renderNotes(payload.notes);
   initializeCharts();
   setupSaleRange();
-  refreshChartTheme();
   installMapLoader();
   render();
 }
@@ -109,10 +102,6 @@ function bindControls() {
   propertyTypeSelect.addEventListener("change", (event) => {
     state.propertyType = event.target.value;
     render();
-  });
-
-  exportButton?.addEventListener("click", () => {
-    void handleExportClick();
   });
 }
 
@@ -642,104 +631,6 @@ function installRevealAnimation() {
   }
 }
 
-function initializeTheme() {
-  const storedTheme = readStoredTheme();
-  const mediaQuery = typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
-  const initialMode = storedTheme || (mediaQuery && mediaQuery.matches ? "dark" : "light");
-  applyTheme(initialMode, { suppressRender: true });
-
-  themeToggle?.addEventListener("click", () => {
-    const next = state.theme === "dark" ? "light" : "dark";
-    applyTheme(next);
-    persistTheme(next);
-  });
-
-  if (mediaQuery) {
-    const handleChange = (event) => {
-      if (readStoredTheme()) {
-        return;
-      }
-      applyTheme(event.matches ? "dark" : "light");
-    };
-
-    if (typeof mediaQuery.addEventListener === "function") {
-      mediaQuery.addEventListener("change", handleChange);
-    } else if (typeof mediaQuery.addListener === "function") {
-      mediaQuery.addListener(handleChange);
-    }
-  }
-}
-
-function applyTheme(mode, options = {}) {
-  const nextTheme = mode === "dark" ? "dark" : "light";
-  const changed = state.theme !== nextTheme;
-  state.theme = nextTheme;
-  document.body.classList.toggle("theme-dark", nextTheme === "dark");
-  updateThemeToggle(nextTheme);
-
-  if (changed && !options.suppressRender && state.charts.transactions) {
-    refreshChartTheme();
-    render();
-  }
-}
-
-function updateThemeToggle(mode) {
-  if (!themeToggle) {
-    return;
-  }
-  const isDark = mode === "dark";
-  themeToggle.textContent = isDark ? "Light mode" : "Dark mode";
-  themeToggle.setAttribute("aria-pressed", String(isDark));
-}
-
-function readStoredTheme() {
-  try {
-    const stored = localStorage.getItem(THEME_STORAGE_KEY);
-    return stored === "dark" || stored === "light" ? stored : null;
-  } catch {
-    return null;
-  }
-}
-
-function persistTheme(mode) {
-  try {
-    localStorage.setItem(THEME_STORAGE_KEY, mode);
-  } catch {
-    // Ignore write failures (e.g., private mode)
-  }
-}
-
-function refreshChartTheme() {
-  if (!state.charts.transactions) {
-    return;
-  }
-
-  const styles = getThemeStyles();
-  const muted = readCssVar(styles, "--muted", "#597169");
-  const gridColor = readCssVar(styles, "--chart-grid", "rgba(23, 48, 42, 0.08)");
-
-  for (const chart of [state.charts.transactions, state.charts.price]) {
-    if (!chart) {
-      continue;
-    }
-    chart.options.scales.x.ticks.color = muted;
-    chart.options.scales.y.ticks.color = muted;
-    chart.options.scales.y.grid.color = gridColor;
-  }
-
-  if (state.charts.mix) {
-    state.charts.mix.options.scales.x.ticks.color = muted;
-    state.charts.mix.options.scales.y.ticks.color = muted;
-    state.charts.mix.options.scales.y.grid.color = gridColor;
-  }
-
-  if (state.charts.zip) {
-    state.charts.zip.options.scales.x.ticks.color = muted;
-    state.charts.zip.options.scales.x.grid.color = gridColor;
-    state.charts.zip.options.scales.y.ticks.color = muted;
-  }
-}
-
 function buildBarPalette(length, styles = getThemeStyles()) {
   const fallbackPalette = ["#365b74", "#be6139", "#d3a14a", "#2f7668"];
   const vars = ["--chart-bar-1", "--chart-bar-2", "--chart-bar-3", "--chart-bar-4"];
@@ -904,110 +795,4 @@ function formatRangeLabel(start, end) {
     return null;
   }
   return `${dateFormatter.format(start)} – ${dateFormatter.format(end)}`;
-}
-
-async function handleExportClick() {
-  if (!exportButton || exportButton.disabled) {
-    return;
-  }
-  const originalText = exportButton.textContent;
-  exportButton.disabled = true;
-
-  const records = getFilteredRecords();
-  if (!records.length) {
-    exportButton.textContent = "No data to export";
-    await wait(1400);
-    exportButton.textContent = originalText;
-    exportButton.disabled = false;
-    return;
-  }
-
-  exportButton.textContent = "Preparing CSV...";
-  try {
-    await exportRecordsAsCsv(records);
-    exportButton.textContent = "Download ready";
-    await wait(1400);
-  } catch (error) {
-    console.error(error);
-    exportButton.textContent = "Export failed";
-    await wait(1600);
-  } finally {
-    exportButton.textContent = originalText;
-    exportButton.disabled = false;
-  }
-}
-
-async function exportRecordsAsCsv(records) {
-  const header = ["Address", "Sale date", "Sale amount", "Property type", "ZIP code", "Latitude", "Longitude"];
-  const parts = [`${header.join(",")}\n`];
-  const chunkSize = 2000;
-
-  for (let index = 0; index < records.length; index += chunkSize) {
-    const chunk = records.slice(index, index + chunkSize);
-    const body = chunk
-      .map((record) =>
-        [
-          record.address,
-          record.saleDateText,
-          record.saleAmount,
-          record.propertyType,
-          record.zipCode,
-          record.lat,
-          record.lon,
-        ]
-          .map(csvEscape)
-          .join(","),
-      )
-      .join("\n");
-    parts.push(body);
-    if (index + chunkSize < records.length) {
-      parts.push("\n");
-    }
-    await wait();
-  }
-
-  const blob = new Blob(parts, { type: "text/csv;charset=utf-8;" });
-  const [rangeStart, rangeEnd] = getActiveDateBounds();
-  const startLabel = formatYmd(rangeStart) || "start";
-  const endLabel = formatYmd(rangeEnd) || "end";
-  const filename = `transactions_${startLabel}_${endLabel}.csv`;
-  const url = URL.createObjectURL(blob);
-  triggerDownload(url, filename);
-}
-
-function csvEscape(value) {
-  if (value === null || value === undefined) {
-    return "";
-  }
-  const stringValue = String(value).replace(/"/g, '""');
-  if (/[",\n]/.test(stringValue)) {
-    return `"${stringValue}"`;
-  }
-  return stringValue;
-}
-
-function triggerDownload(url, filename) {
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.style.display = "none";
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  setTimeout(() => URL.revokeObjectURL(url), 4000);
-}
-
-function wait(ms = 0) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
-
-function formatYmd(date) {
-  if (!date) {
-    return "";
-  }
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${month}-${day}`;
 }
