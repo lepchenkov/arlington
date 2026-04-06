@@ -112,10 +112,8 @@ a {
 
 .hero-text,
 .section-copy,
-#method-note,
 .stat-foot,
 .meta-label,
-.control-label,
 .sales-meta,
 .note-list {
   color: var(--muted);
@@ -139,61 +137,6 @@ a {
   display: block;
   margin-top: 0.25rem;
   font-size: 1.05rem;
-}
-
-.controls {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1rem;
-  padding: 1.2rem;
-  margin-bottom: 1.4rem;
-  align-items: start;
-}
-
-.control-block {
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-}
-
-.notes-block {
-  grid-column: 1 / -1;
-}
-
-.chip-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.chip,
-select {
-  border-radius: 999px;
-  border: 1px solid var(--surface-border);
-  background: var(--surface);
-  color: var(--ink);
-  font: inherit;
-}
-
-.chip {
-  padding: 0.7rem 1rem;
-  cursor: pointer;
-  transition: transform 180ms ease, background 180ms ease, color 180ms ease;
-}
-
-.chip:hover,
-.chip:focus-visible {
-  transform: translateY(-1px);
-}
-
-.chip.is-active {
-  background: linear-gradient(135deg, var(--accent), var(--accent-soft));
-  color: white;
-  border-color: transparent;
-}
-
-select {
-  padding: 0.8rem 1rem;
 }
 
 .stats-grid,
@@ -374,7 +317,6 @@ canvas {
 
 @media (max-width: 1080px) {
   .hero,
-  .controls,
   .stats-grid,
   .chart-grid,
   .detail-grid {
@@ -403,7 +345,6 @@ canvas {
   .chart-grid .panel,
   .detail-grid .panel,
   .map-section,
-  .controls,
   .hero-meta,
   .stat-card {
     border-radius: 20px;

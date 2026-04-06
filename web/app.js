@@ -1,8 +1,6 @@
 const state = {
   records: [],
   payload: null,
-  windowYears: 3,
-  propertyType: "All",
   charts: {},
   map: null,
   heatLayer: null,
@@ -10,6 +8,8 @@ const state = {
   mapVisible: false,
   heatCache: new Map(),
 };
+
+const DEFAULT_WINDOW_YEARS = 3;
 
 const currency = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -38,9 +38,6 @@ const quarterLabelFormatter = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
 });
 
-const propertyTypeSelect = document.querySelector("#property-type");
-const windowControls = document.querySelector("#window-controls");
-
 boot().catch((error) => {
   console.error(error);
   document.querySelector("#generated-at").textContent = "Build failed";
@@ -48,7 +45,6 @@ boot().catch((error) => {
 
 async function boot() {
   installRevealAnimation();
-  bindControls();
 
   const response = await fetch("./data/transactions.json");
   if (!response.ok) {
@@ -68,29 +64,10 @@ async function boot() {
   });
 
   populateMeta(payload);
-  populatePropertyTypes(payload.propertyTypes);
   renderNotes(payload.notes);
   initializeCharts();
   installMapLoader();
   render();
-}
-
-function bindControls() {
-  windowControls.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-window]");
-    if (!button) {
-      return;
-    }
-
-    state.windowYears = Number(button.dataset.window);
-    activateWindowChip(button);
-    render();
-  });
-
-  propertyTypeSelect.addEventListener("change", (event) => {
-    state.propertyType = event.target.value;
-    render();
-  });
 }
 
 function populateMeta(payload) {
@@ -99,14 +76,6 @@ function populateMeta(payload) {
   document.querySelector("#coverage-window").textContent = `${payload.window.startDate} to ${payload.window.endDate}`;
   const sourceLink = document.querySelector("#source-link");
   sourceLink.href = payload.source.salesApi;
-  document.querySelector("#method-note").textContent = payload.notes[2];
-}
-
-function populatePropertyTypes(propertyTypes) {
-  const options = ["All", ...propertyTypes];
-  propertyTypeSelect.innerHTML = options
-    .map((option) => `<option value="${option}">${option}</option>`)
-    .join("");
 }
 
 function renderNotes(notes) {
@@ -220,13 +189,10 @@ function getFilteredRecords() {
     return [];
   }
   const threshold = new Date(latestDate);
-  threshold.setFullYear(threshold.getFullYear() - state.windowYears);
+  threshold.setFullYear(threshold.getFullYear() - DEFAULT_WINDOW_YEARS);
 
   return state.records.filter((record) => {
     if (record.saleDate < threshold) {
-      return false;
-    }
-    if (state.propertyType !== "All" && record.propertyType !== state.propertyType) {
       return false;
     }
     return true;
@@ -250,7 +216,7 @@ function renderStats(records) {
   const latestRecord = records[0];
 
   setText("#transactions-value", count.toLocaleString("en-US"));
-  setText("#transactions-foot", `${state.windowYears}-year transaction count`);
+  setText("#transactions-foot", `${DEFAULT_WINDOW_YEARS}-year transaction count`);
   setText("#median-value", amounts.length ? currency.format(medianValue) : "-");
   setText("#median-foot", "50th percentile recorded sale");
   setText("#volume-value", compactNumber.format(totalVolume));
@@ -373,7 +339,7 @@ function renderMap(records) {
 }
 
 function buildHeatGrid(records) {
-  const cacheKey = `${state.windowYears}:${state.propertyType}:${records.length}`;
+  const cacheKey = `${DEFAULT_WINDOW_YEARS}:${records.length}`;
   if (state.heatCache.has(cacheKey)) {
     return state.heatCache.get(cacheKey);
   }
@@ -618,10 +584,4 @@ function getThemeStyles() {
 function readCssVar(styles, name, fallback = "") {
   const value = styles.getPropertyValue(name).trim();
   return value || fallback;
-}
-
-function activateWindowChip(activeButton) {
-  for (const item of windowControls.querySelectorAll(".chip")) {
-    item.classList.toggle("is-active", item === activeButton);
-  }
 }
